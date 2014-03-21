@@ -411,6 +411,11 @@ s390*-*-*)
 	build_gdbserver=yes
 	;;
 
+riscv*-*-*)
+	# Target: RISC-V architecture
+	gdb_target_obs="riscv-tdep.o"
+	;;
+
 rx-*-elf)
 	# Target: Renesas RX
 	gdb_target_obs="rx-tdep.o"

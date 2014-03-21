@@ -4,7 +4,7 @@
 #   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
 #   Free Software Foundation, Inc.
 
-timestamp='2010-05-21'
+timestamp='2014-03-21'
 
 # This file is (in principle) common to ALL GNU software.
 # The presence of a machine in this file suggests that SOME GNU software
@@ -148,7 +148,7 @@ case $os in
 	-sun*os*)
 		# Prevent following clause from handling this invalid input.
 		;;
-	-dec* | -mips* | -sequent* | -encore* | -pc532* | -sgi* | -sony* | \
+	-dec* | -mips* | -riscv* | -sequent* | -encore* | -pc532* | -sgi* | -sony* | \
 	-att* | -7300* | -3300* | -delta* | -motorola* | -sun[234]* | \
 	-unicom* | -ibm* | -next | -hp | -isi* | -apollo | -altos* | \
 	-convergent* | -ncr* | -news | -32* | -3600* | -3100* | -hitachi* |\
@@ -279,6 +279,7 @@ case $basic_machine in
 	| mipsisa64sb1 | mipsisa64sb1el \
 	| mipsisa64sr71k | mipsisa64sr71kel \
 	| mipstx39 | mipstx39el \
+        | riscv \
 	| mn10200 | mn10300 \
 	| moxie \
 	| mt \
@@ -973,6 +974,10 @@ case $basic_machine in
 		basic_machine=i386-pc
 		os=-rdos
 		;;
+        riscv | riscv-*)
+                basic_machine=riscv-unknown
+                os=-elf
+                ;;
 	rom68k)
 		basic_machine=m68k-rom68k
 		os=-coff
@@ -1538,6 +1543,9 @@ case $basic_machine in
 	or32-*)
 		os=-coff
 		;;
+        riscv-*)
+                os=-elf
+                ;;
 	*-tti)	# must be before sparc entry or we get the wrong os.
 		os=-sysv3
 		;;
