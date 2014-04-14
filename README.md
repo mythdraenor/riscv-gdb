@@ -9,7 +9,7 @@ $ mkdir build
 
 $ cd build
 
-$ ../configure --program-prefix=riscv- --enable-riscv --enable-targets=riscv-unknown-elf
+$ ../configure --program-prefix=riscv-
 
 $ make
 
