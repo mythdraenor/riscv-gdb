@@ -620,7 +620,7 @@ print_insn_mips (bfd_vma memaddr,
 {
   const struct riscv_opcode *op;
   static bfd_boolean init = 0;
-  static const char *extension = NULL;
+  static const char *extension = "Xhwacha";
   static const struct riscv_opcode *mips_hash[OP_MASK_OP + 1];
   struct riscv_private_data *pd;
   int insnlen;
@@ -629,8 +629,9 @@ print_insn_mips (bfd_vma memaddr,
   if (! init)
     {
       unsigned int i;
-      unsigned int e_flags = elf_elfheader (info->section->owner)->e_flags;
-      extension = riscv_elf_flag_to_name(EF_GET_RISCV_EXT(e_flags));
+      // this is temporary until the elf flags are properly generated
+      //      unsigned int e_flags = elf_elfheader (info->section->owner)->e_flags;
+      //      extension = riscv_elf_flag_to_name(EF_GET_RISCV_EXT(e_flags));
 
       for (i = 0; i <= OP_MASK_OP; i++)
         for (op = riscv_opcodes; op < &riscv_opcodes[NUMOPCODES]; op++)
