@@ -80,8 +80,10 @@ const static char *riscv_gdb_reg_names[RISCV_LAST_REGNUM+1] = {
   "f8",  "f9",  "f10", "f11", "f12", "f13", "f14", "f15",
   "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23",
   "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31", "fcsr",
-  "sr",  "epc", "badvaddr", "evec", "cause", "count", "compare",
-  "send_ipi", "clear_ipi", "hartid", "impl", "sup0", "sup1", "fromhost", "tohost",
+  "fflags", "frm", "sup0", "sup1", "epc", "badvaddr", "ptbr",
+  "asid", "count", "compare", "evec", "cause", "status", "hartid",
+  "impl", "fatc", "send_ipi", "clear_ipi", "stats", "reset", "tohost", 
+  "fromhost", "cycle", "time", "instret",
 };
 
 struct register_alias
@@ -823,15 +825,15 @@ riscv_gdbarch_init (struct gdbarch_info  info,
 
   // For now, base the abi on the elf class.  elf_flags could be used here (like with mips)
   // to further specify the ABI
-  if (elf_elfheader (info.abfd)->e_ident[EI_CLASS] == ELFCLASS32) {
-    tdep->register_size_valid = 1;
-    tdep->register_size = 4;
-    tdep->riscv_abi = RISCV_ABI_RV32G;
-  } else if (elf_elfheader (info.abfd)->e_ident[EI_CLASS] == ELFCLASS64) {
+  //  if (elf_elfheader (info.abfd)->e_ident[EI_CLASS] == ELFCLASS32) {
+  //    tdep->register_size_valid = 1;
+  //    tdep->register_size = 4;
+  //    tdep->riscv_abi = RISCV_ABI_RV32G;
+  //  } else if (elf_elfheader (info.abfd)->e_ident[EI_CLASS] == ELFCLASS64) {
     tdep->register_size_valid = 1;
     tdep->register_size = 8;
     tdep->riscv_abi = RISCV_ABI_RV64G;
-  }
+    //  }
 
   // target data types
   set_gdbarch_short_bit             (gdbarch, 16);
