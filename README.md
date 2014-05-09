@@ -9,7 +9,7 @@ $ mkdir build
 
 $ cd build
 
-$ ../configure --program-prefix=riscv-
+$ ../configure --program-prefix=riscv- --target=riscv
 
 $ make
 
