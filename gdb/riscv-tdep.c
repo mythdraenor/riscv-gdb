@@ -443,7 +443,7 @@ riscv_register_type (struct gdbarch  *gdbarch,
     } else {
       return builtin_type (gdbarch)->builtin_int64;
     }
-  } else if (regnum <= RISCV_FCSR_REGNUM) {
+  } else if (regnum < RISCV_FCSR_REGNUM) {
     if (riscv_isa_regsize (gdbarch) == 4) {
       return builtin_type (gdbarch)->builtin_float;
     } else {
@@ -459,27 +459,238 @@ riscv_register_type (struct gdbarch  *gdbarch,
 }
 
 static void
+riscv_read_fp_register_single (struct frame_info *frame, int regno,
+			       gdb_byte *rare_buffer)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  int raw_size = register_size (gdbarch, regno);
+  gdb_byte *raw_buffer = alloca (raw_size);
+
+  if (!frame_register_read (frame, regno, raw_buffer)) {
+    error(_("can't read register %d (%s)"), regno, gdbarch_register_name (gdbarch, regno));
+  }
+
+  if (raw_size == 8) {
+    int offset;
+    
+    if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+      offset = 4;
+    else
+      offset = 0;
+
+    memcpy(rare_buffer, raw_buffer + offset, 4);
+  } else {
+    memcpy(rare_buffer, raw_buffer, 4);
+  }
+}
+
+static void
+riscv_read_fp_register_double (struct frame_info *frame, int regno,
+			       gdb_byte *rare_buffer)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  int raw_size = register_size (gdbarch, regno);
+
+  if (raw_size == 8) {
+    if (!frame_register_read (frame, regno, rare_buffer)) {
+      error(_("can't read register %d (%s)"), regno, gdbarch_register_name (gdbarch, regno));
+    }
+  } else {
+    internal_error(__FILE__, __LINE__, _("riscv_read_fp_register_double: size says 32-bits, read is 64-bits."));
+  }
+}
+
+static void
+riscv_print_fp_register (struct ui_file *file, struct frame_info *frame,
+			 int regnum)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  gdb_byte *raw_buffer;
+  double doub, flt1;
+  int inv1, inv2;
+
+  raw_buffer = alloca (2 * register_size (gdbarch, RISCV_FIRST_FP_REGNUM));
+
+  fprintf_filtered (file, "%s:", gdbarch_register_name (gdbarch, regnum));
+  fprintf_filtered (file, "%*s", 4 - (int)strlen(gdbarch_register_name (gdbarch, regnum)), "");
+
+  if (register_size (gdbarch, regnum) == 4) {
+    struct value_print_options opts;
+
+    riscv_read_fp_register_single (frame, regnum, raw_buffer);
+    flt1 = unpack_double (builtin_type (gdbarch)->builtin_float, raw_buffer, &inv1);
+
+    get_formatted_print_options (&opts, 'x');
+    print_scalar_formatted (raw_buffer, 
+			    builtin_type (gdbarch)->builtin_uint32,
+			    &opts, 'w', file);
+
+    fprintf_filtered (file, " value: ");
+    if (inv1)
+      fprintf_filtered (file, " <invalid float> ");
+    else
+      fprintf_filtered (file, "%-17.9g", flt1);
+  } 
+  else {
+    struct value_print_options opts;
+
+    riscv_read_fp_register_double (frame, regnum, raw_buffer);
+    doub = unpack_double (builtin_type (gdbarch)->builtin_double, raw_buffer, &inv2);
+    
+    get_formatted_print_options (&opts, 'x');
+    print_scalar_formatted (raw_buffer, builtin_type (gdbarch)->builtin_uint64, 
+			    &opts, 'g', file);
+
+    fprintf_filtered (file, " value: ");
+    if (inv2)
+      fprintf_filtered (file, "<invalid double>");
+    else
+      fprintf_filtered (file, "%-24.17g", doub);
+  }
+}
+
+static int
+print_fp_register_row (struct ui_file *file, struct frame_info *frame,
+		       int regnum)
+{
+  fprintf_filtered (file, " ");
+  riscv_print_fp_register (file, frame, regnum);
+  fprintf_filtered (file, "\n");
+  return regnum+1;
+}
+
+static int
+print_gp_register_row (struct ui_file *file, struct frame_info *frame,
+		       int start_regnum)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  gdb_byte raw_buffer[MAX_REGISTER_SIZE];
+  int ncols = (riscv_abi_regsize (gdbarch) == 8 ? 4 : 8);
+  int col, byte;
+  int regnum;
+
+  for(col = 0, regnum = start_regnum; 
+      col < ncols && regnum < RISCV_LAST_REGNUM;
+      regnum++) {
+    if (*gdbarch_register_name (gdbarch, regnum) == '\0') {
+      continue;
+    }
+    if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT)
+      break;
+    if (col == 0)
+      fprintf_filtered (file, "     ");
+    fprintf_filtered(file,
+		     riscv_abi_regsize (gdbarch) == 8 ? "%17s" : "%9s",
+		     gdbarch_register_name (gdbarch, regnum));
+    col++;
+  }
+
+  if (col == 0)
+    return regnum;
+
+  if (start_regnum < RISCV_PC_REGNUM) {
+    fprintf_filtered (file, "\n x%-4d", start_regnum);
+  } else {
+    fprintf_filtered (file, "\n      ");
+  }
+
+  for(col = 0, regnum = start_regnum;
+      col < ncols && regnum < RISCV_LAST_REGNUM;
+      regnum++) {
+    if (*gdbarch_register_name (gdbarch, regnum) == '\0') 
+      continue;
+    if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT)
+      break;
+   
+    if (!frame_register_read (frame, regnum, raw_buffer)) {
+      error (_("can't read register %d (%s)"), regnum, gdbarch_register_name (gdbarch, regnum));
+    }
+
+    if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG) {
+      for(byte = register_size(gdbarch, regnum) - register_size (gdbarch, regnum);
+	  byte < register_size (gdbarch, regnum); byte++) {
+	fprintf_filtered (file, "%02x", raw_buffer[byte]);
+      }
+    } else {
+      for(byte = register_size (gdbarch, regnum) - 1; 
+	  byte >= 0; byte--) {
+	fprintf_filtered (file, "%02x", raw_buffer[byte]);
+      }
+      fprintf_filtered (file, " ");
+      col++;
+    }
+  }
+
+  if (col > 0)
+    fprintf_filtered (file, "\n");
+  
+  return regnum;
+}
+
+static void
+riscv_print_register (struct ui_file *file, struct frame_info *frame,
+		      int regnum)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  gdb_byte raw_buffer[MAX_REGISTER_SIZE];
+  int offset;
+  struct value_print_options opts;
+
+  if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT) {
+    riscv_print_fp_register (file, frame, regnum);
+    return;
+  }
+
+  if (!frame_register_read (frame, regnum, raw_buffer)) {
+    fprintf_filtered (file, "%s: [Invalid]", gdbarch_register_name (gdbarch, regnum));
+    return;
+  }
+
+  fputs_filtered (gdbarch_register_name (gdbarch, regnum), file);
+  fprintf_filtered (file, ": ");
+
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG) {
+    offset = register_size (gdbarch, regnum) - register_size (gdbarch, regnum);
+  } else {
+    offset = 0;
+  }
+
+  get_formatted_print_options (&opts, 'x');
+  print_scalar_formatted (raw_buffer + offset,
+			  register_type (gdbarch, regnum), &opts, 0, file);
+}
+
+
+
+static void
 riscv_print_registers_info (struct gdbarch    *gdbarch,
 			    struct ui_file    *file,
 			    struct frame_info *frame,
 			    int                regnum,
 			    int                all)
 {
-  struct regcache *regcache = get_current_regcache ();
+  if (regnum != -1) { // print one specified register
+    gdb_assert (regnum < RISCV_LAST_REGNUM);
+    if ('\0' == *(riscv_register_name (gdbarch, regnum))) {
+      error(_("Not a valid register for the current processor type"));
+    }
+    riscv_print_register (file, frame, regnum);
+    fprintf_filtered (file, "\n");
+  }
+  else {
+    regnum = 0;
+    while(regnum < RISCV_LAST_REGNUM) {
+      if ('\0' == *(riscv_register_name (gdbarch, regnum))) {
+	error(_("Not a valid register for the current processor type"));
+      }
 
-  if (-1 == regnum) {
-    unsigned int lim = RISCV_LAST_REGNUM;
-
-    for (regnum = 0; regnum < lim; regnum++) {
-      if ('\0' != *(riscv_register_name (gdbarch, regnum))) {
-	riscv_print_registers_info (gdbarch, file, frame, regnum, all);
+      if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT) {
+	if (all) regnum = print_fp_register_row (file, frame, regnum);
+	else     regnum++;
+      } else {
+	regnum = print_gp_register_row (file, frame, regnum);
       }
     }
-  } else {
-    if ((regnum < RISCV_LAST_REGNUM) && ('\0' == *(riscv_register_name (gdbarch, regnum)))) {
-      error ("Not a valid register for the current processor type");
-    }
-    default_print_registers_info (gdbarch, file, frame, regnum, all);
   }
 }
 
@@ -873,7 +1084,7 @@ riscv_gdbarch_init (struct gdbarch_info  info,
   set_gdbarch_register_name         (gdbarch, riscv_register_name);
   set_gdbarch_register_type         (gdbarch, riscv_register_type);
   set_gdbarch_print_registers_info  (gdbarch, riscv_print_registers_info);
-  set_gdbarch_register_reggroup_p   (gdbarch, riscv_register_reggroup_p); // XXX
+  set_gdbarch_register_reggroup_p   (gdbarch, riscv_register_reggroup_p);
 
   // functions to analyze frames
   set_gdbarch_skip_prologue         (gdbarch, riscv_skip_prologue); 
@@ -966,7 +1177,7 @@ _initialize_riscv_tdep(void)
 
   add_prefix_cmd ("riscv", no_class, show_riscv_command,
 		  _("Various RISCV specific commands."),
-		  &showriscvcmdlist, "show mips ", 0, &showlist);
+		  &showriscvcmdlist, "show riscv ", 0, &showlist);
 
   /* Debug this file's internals. */
   add_setshow_zinteger_cmd ("riscv", class_maintenance, &riscv_debug, _("\
