@@ -331,10 +331,17 @@ static const char *
 riscv_register_name (struct gdbarch *gdbarch,
 		     int             regnum)
 {
+  int i;
+
   if (tdesc_has_registers (gdbarch_target_desc (gdbarch)))
     return tdesc_register_name(gdbarch, regnum);
   else {
     if (0 <= regnum && regnum < RISCV_LAST_REGNUM) {
+      for(i = 0; i < (sizeof(riscv_register_aliases)/sizeof(riscv_register_aliases[0])); i++) {
+	if (regnum == riscv_register_aliases[i].regnum) {
+	  return riscv_register_aliases[i].name;
+	}
+      }
       return riscv_gdb_reg_names[regnum];
     } else {
       return NULL;
@@ -556,6 +563,39 @@ riscv_print_fp_register (struct ui_file *file, struct frame_info *frame,
   }
 }
 
+static void
+riscv_print_register (struct ui_file *file, struct frame_info *frame,
+		      int regnum)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  gdb_byte raw_buffer[MAX_REGISTER_SIZE];
+  int offset;
+  struct value_print_options opts;
+
+  if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT) {
+    riscv_print_fp_register (file, frame, regnum);
+    return;
+  }
+
+  if (!frame_register_read (frame, regnum, raw_buffer)) {
+    fprintf_filtered (file, "%s: [Invalid]", gdbarch_register_name (gdbarch, regnum));
+    return;
+  }
+
+  fputs_filtered (gdbarch_register_name (gdbarch, regnum), file);
+  fprintf_filtered (file, ": ");
+
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG) {
+    offset = register_size (gdbarch, regnum) - register_size (gdbarch, regnum);
+  } else {
+    offset = 0;
+  }
+
+  get_formatted_print_options (&opts, 'x');
+  print_scalar_formatted (raw_buffer + offset,
+			  register_type (gdbarch, regnum), &opts, 0, file);
+}
+
 static int
 print_fp_register_row (struct ui_file *file, struct frame_info *frame,
 		       int regnum)
@@ -635,39 +675,52 @@ print_gp_register_row (struct ui_file *file, struct frame_info *frame,
 }
 
 static void
-riscv_print_register (struct ui_file *file, struct frame_info *frame,
-		      int regnum)
+riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
+				int regnum)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   gdb_byte raw_buffer[MAX_REGISTER_SIZE];
-  int offset;
+  double doub;
+  long long d;
+  int inv2, offset;
   struct value_print_options opts;
 
+  // floating point
   if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT) {
-    riscv_print_fp_register (file, frame, regnum);
-    return;
+    riscv_read_fp_register_double (frame, regnum, raw_buffer);
+    doub = unpack_double (builtin_type (gdbarch)->builtin_double, raw_buffer, &inv2);
+    
+    fprintf_filtered (file, "%-10s     ", riscv_register_name(gdbarch, regnum));
+    get_formatted_print_options (&opts, 'x');
+    print_scalar_formatted (raw_buffer, builtin_type (gdbarch)->builtin_uint64, &opts, 'g', file);
+    if (inv2)
+      fprintf_filtered (file, " <invalid double>\n");
+    else
+      fprintf_filtered (file, " %-24.17g\n", doub);
+  } 
+  else {
+    if (!frame_register_read (frame, regnum, raw_buffer)) {
+      fprintf_filtered (file, "%-10s     [Invalid]", riscv_register_name(gdbarch, regnum));
+      return;
+    }
+
+    fprintf_filtered (file, "%-10s     ", riscv_register_name(gdbarch, regnum));
+    if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG) {
+      offset = register_size (gdbarch, regnum) - register_size (gdbarch, regnum);
+    } else {
+      offset = 0;
+    }
+    
+    get_formatted_print_options (&opts, 'x');
+    print_scalar_formatted (raw_buffer + offset,
+			    register_type (gdbarch, regnum), &opts, 0, file);
+    fprintf_filtered (file, "\t");
+    get_formatted_print_options (&opts, 'd');
+    print_scalar_formatted (raw_buffer + offset,
+			    register_type (gdbarch, regnum), &opts, 0, file);
+    fprintf_filtered (file, "\n");
   }
-
-  if (!frame_register_read (frame, regnum, raw_buffer)) {
-    fprintf_filtered (file, "%s: [Invalid]", gdbarch_register_name (gdbarch, regnum));
-    return;
-  }
-
-  fputs_filtered (gdbarch_register_name (gdbarch, regnum), file);
-  fprintf_filtered (file, ": ");
-
-  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG) {
-    offset = register_size (gdbarch, regnum) - register_size (gdbarch, regnum);
-  } else {
-    offset = 0;
-  }
-
-  get_formatted_print_options (&opts, 'x');
-  print_scalar_formatted (raw_buffer + offset,
-			  register_type (gdbarch, regnum), &opts, 0, file);
 }
-
-
 
 static void
 riscv_print_registers_info (struct gdbarch    *gdbarch,
@@ -692,11 +745,11 @@ riscv_print_registers_info (struct gdbarch    *gdbarch,
       }
 
       if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT) {
-	if (all) regnum = print_fp_register_row (file, frame, regnum);
-	else     regnum++;
+	if (all) riscv_print_register_formatted (file, frame, regnum);
       } else {
-	regnum = print_gp_register_row (file, frame, regnum);
+	riscv_print_register_formatted (file, frame, regnum);
       }
+      regnum++;
     }
   }
 }
