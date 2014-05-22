@@ -313,6 +313,13 @@ riscv_breakpoint_from_pc (struct gdbarch *gdbarch,
   return breakpoint;
 }
 
+static void
+riscv_remote_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *kindptr)
+{
+  struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+  riscv_breakpoint_from_pc (gdbarch, pcptr, kindptr);
+}
+
 static struct value *
 value_of_riscv_user_reg (struct frame_info *frame, const void *baton)
 {
@@ -1066,8 +1073,9 @@ riscv_gdbarch_init (struct gdbarch_info  info,
   // information about the target architecture
   set_gdbarch_return_value          (gdbarch, riscv_return_value);
   set_gdbarch_breakpoint_from_pc    (gdbarch, riscv_breakpoint_from_pc);
-  set_gdbarch_have_nonsteppable_watchpoint
-                                    (gdbarch, 1);
+  set_gdbarch_remote_breakpoint_from_pc (gdbarch, riscv_remote_breakpoint_from_pc);
+  //  set_gdbarch_have_nonsteppable_watchpoint
+  //                                    (gdbarch, 1);
   set_gdbarch_print_insn            (gdbarch, gdb_print_insn_riscv);
 
   // register architecture
