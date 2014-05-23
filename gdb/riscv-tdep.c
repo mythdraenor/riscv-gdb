@@ -596,84 +596,6 @@ riscv_print_register (struct ui_file *file, struct frame_info *frame,
 			  register_type (gdbarch, regnum), &opts, 0, file);
 }
 
-static int
-print_fp_register_row (struct ui_file *file, struct frame_info *frame,
-		       int regnum)
-{
-  fprintf_filtered (file, " ");
-  riscv_print_fp_register (file, frame, regnum);
-  fprintf_filtered (file, "\n");
-  return regnum+1;
-}
-
-static int
-print_gp_register_row (struct ui_file *file, struct frame_info *frame,
-		       int start_regnum)
-{
-  struct gdbarch *gdbarch = get_frame_arch (frame);
-  gdb_byte raw_buffer[MAX_REGISTER_SIZE];
-  int ncols = (riscv_abi_regsize (gdbarch) == 8 ? 4 : 8);
-  int col, byte;
-  int regnum;
-
-  for(col = 0, regnum = start_regnum; 
-      col < ncols && regnum < RISCV_LAST_REGNUM;
-      regnum++) {
-    if (*gdbarch_register_name (gdbarch, regnum) == '\0') {
-      continue;
-    }
-    if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT)
-      break;
-    if (col == 0)
-      fprintf_filtered (file, "     ");
-    fprintf_filtered(file,
-		     riscv_abi_regsize (gdbarch) == 8 ? "%17s" : "%9s",
-		     gdbarch_register_name (gdbarch, regnum));
-    col++;
-  }
-
-  if (col == 0)
-    return regnum;
-
-  if (start_regnum < RISCV_PC_REGNUM) {
-    fprintf_filtered (file, "\n x%-4d", start_regnum);
-  } else {
-    fprintf_filtered (file, "\n      ");
-  }
-
-  for(col = 0, regnum = start_regnum;
-      col < ncols && regnum < RISCV_LAST_REGNUM;
-      regnum++) {
-    if (*gdbarch_register_name (gdbarch, regnum) == '\0') 
-      continue;
-    if (TYPE_CODE (register_type (gdbarch, regnum)) == TYPE_CODE_FLT)
-      break;
-   
-    if (!frame_register_read (frame, regnum, raw_buffer)) {
-      error (_("can't read register %d (%s)"), regnum, gdbarch_register_name (gdbarch, regnum));
-    }
-
-    if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG) {
-      for(byte = register_size(gdbarch, regnum) - register_size (gdbarch, regnum);
-	  byte < register_size (gdbarch, regnum); byte++) {
-	fprintf_filtered (file, "%02x", raw_buffer[byte]);
-      }
-    } else {
-      for(byte = register_size (gdbarch, regnum) - 1; 
-	  byte >= 0; byte--) {
-	fprintf_filtered (file, "%02x", raw_buffer[byte]);
-      }
-      fprintf_filtered (file, " ");
-      col++;
-    }
-  }
-
-  if (col > 0)
-    fprintf_filtered (file, "\n");
-  
-  return regnum;
-}
-
 static void
 riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
 				int regnum)
@@ -697,7 +619,7 @@ riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
       fprintf_filtered (file, " <invalid double>\n");
     else
       fprintf_filtered (file, " %-24.17g\n", doub);
-  } 
+  }
   else {
     if (!frame_register_read (frame, regnum, raw_buffer)) {
       fprintf_filtered (file, "%-10s     [Invalid]", riscv_register_name(gdbarch, regnum));
@@ -715,10 +637,27 @@ riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
     print_scalar_formatted (raw_buffer + offset,
 			    register_type (gdbarch, regnum), &opts, 0, file);
     fprintf_filtered (file, "\t");
-    get_formatted_print_options (&opts, 'd');
-    print_scalar_formatted (raw_buffer + offset,
-			    register_type (gdbarch, regnum), &opts, 0, file);
-    fprintf_filtered (file, "\n");
+
+    if (regnum == RISCV_STATUS_REGNUM) {
+      d = unpack_long (builtin_type (gdbarch)->builtin_int64, raw_buffer);
+      fprintf_filtered (file, "[ IP:%02X IM:%02X EA:%d VM:%d S64:%d U64:%d EF:%d PEI:%d EI:%d PS:%d S:%d ]\n",
+			(int)((d >> 24) & 0xFF),
+			(int)((d >> 16) & 0xFF),
+			(int)((d >> 8) & 0x1),
+			(int)((d >> 7) & 0x1),
+			(int)((d >> 6) & 0x1),
+			(int)((d >> 5) & 0x1),
+			(int)((d >> 4) & 0x1),
+			(int)((d >> 3) & 0x1),
+			(int)((d >> 2) & 0x1),
+			(int)((d >> 1) & 0x1),
+			(int)((d >> 0) & 0x1));
+    } else {
+      get_formatted_print_options (&opts, 'd');
+      print_scalar_formatted (raw_buffer + offset,
+			      register_type (gdbarch, regnum), &opts, 0, file);
+      fprintf_filtered (file, "\n");
+    }
   }
 }
 
