@@ -466,7 +466,12 @@ riscv_register_type (struct gdbarch  *gdbarch,
   } else {
     if (riscv_isa_regsize (gdbarch) == 4) {
       return builtin_type (gdbarch)->builtin_int32;
-    } else if (regnum == RISCV_COMPARE_REGNUM || regnum == RISCV_COUNT_REGNUM) {
+    } else if (regnum == RISCV_COMPARE_REGNUM || 
+	       regnum == RISCV_COUNT_REGNUM ||
+	       regnum == RISCV_FFLAGS_REGNUM ||
+	       regnum == RISCV_FRM_REGNUM ||
+	       regnum == RISCV_STATUS_REGNUM
+	       ) {
       return builtin_type (gdbarch)->builtin_int32;
     } else {
       return builtin_type (gdbarch)->builtin_int64;
