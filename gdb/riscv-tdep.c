@@ -466,6 +466,8 @@ riscv_register_type (struct gdbarch  *gdbarch,
   } else {
     if (riscv_isa_regsize (gdbarch) == 4) {
       return builtin_type (gdbarch)->builtin_int32;
+    } else if (regnum == RISCV_COMPARE_REGNUM || regnum == RISCV_COUNT_REGNUM) {
+      return builtin_type (gdbarch)->builtin_int32;
     } else {
       return builtin_type (gdbarch)->builtin_int64;
     }
@@ -594,6 +596,11 @@ riscv_print_register (struct ui_file *file, struct frame_info *frame,
   get_formatted_print_options (&opts, 'x');
   print_scalar_formatted (raw_buffer + offset,
 			  register_type (gdbarch, regnum), &opts, 0, file);
+  fprintf_filtered (file, "\t");
+  get_formatted_print_options (&opts, 'd');
+  print_scalar_formatted (raw_buffer + offset,
+			  register_type (gdbarch, regnum), &opts, 0, file);
+  fprintf_filtered (file, "\n");
 }
 
 static void
