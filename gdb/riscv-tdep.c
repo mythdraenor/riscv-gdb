@@ -651,7 +651,7 @@ riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
     fprintf_filtered (file, "\t");
 
     if (regnum == RISCV_STATUS_REGNUM) {
-      d = unpack_long (builtin_type (gdbarch)->builtin_int64, raw_buffer);
+      d = unpack_long (builtin_type (gdbarch)->builtin_int32, raw_buffer);
       fprintf_filtered (file, "[ IP:%02X IM:%02X EA:%d VM:%d S64:%d U64:%d EF:%d PEI:%d EI:%d PS:%d S:%d ]\n",
 			(int)((d >> 24) & 0xFF),
 			(int)((d >> 16) & 0xFF),
@@ -659,6 +659,15 @@ riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
 			(int)((d >> 7) & 0x1),
 			(int)((d >> 6) & 0x1),
 			(int)((d >> 5) & 0x1),
+			(int)((d >> 4) & 0x1),
+			(int)((d >> 3) & 0x1),
+			(int)((d >> 2) & 0x1),
+			(int)((d >> 1) & 0x1),
+			(int)((d >> 0) & 0x1));
+    } else if (regnum == RISCV_FCSR_REGNUM) {
+      d = unpack_long (builtin_type (gdbarch)->builtin_int64, raw_buffer);
+      fprintf_filtered (file, "[ RD:%01X NV:%d DZ:%d OF:%d UF:%d NX:%d ]\n",
+			(int)((d >> 5) & 0x7),
 			(int)((d >> 4) & 0x1),
 			(int)((d >> 3) & 0x1),
 			(int)((d >> 2) & 0x1),
