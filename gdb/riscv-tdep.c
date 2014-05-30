@@ -470,6 +470,7 @@ riscv_register_type (struct gdbarch  *gdbarch,
 	       regnum == RISCV_COUNT_REGNUM ||
 	       regnum == RISCV_FFLAGS_REGNUM ||
 	       regnum == RISCV_FRM_REGNUM ||
+	       regnum == RISCV_FCSR_REGNUM ||
 	       regnum == RISCV_STATUS_REGNUM
 	       ) {
       return builtin_type (gdbarch)->builtin_int32;
@@ -665,7 +666,7 @@ riscv_print_register_formatted (struct ui_file *file, struct frame_info *frame,
 			(int)((d >> 1) & 0x1),
 			(int)((d >> 0) & 0x1));
     } else if (regnum == RISCV_FCSR_REGNUM) {
-      d = unpack_long (builtin_type (gdbarch)->builtin_int64, raw_buffer);
+      d = unpack_long (builtin_type (gdbarch)->builtin_int32, raw_buffer);
       fprintf_filtered (file, "[ RD:%01X NV:%d DZ:%d OF:%d UF:%d NX:%d ]\n",
 			(int)((d >> 5) & 0x7),
 			(int)((d >> 4) & 0x1),
