@@ -510,7 +510,7 @@ extern void warn_deprecated (const char *, const char *, int, const char *);
 
 #define bfd_get_symbol_leading_char(abfd) ((abfd)->xvec->symbol_leading_char)
 
-#define bfd_set_cacheable(abfd,bool) (((abfd)->cacheable = bool), TRUE)
+#define bfd_set_cacheable(abfd,bool) ((abfd)->cacheable = bool)
 
 extern bfd_boolean bfd_cache_close
   (bfd *abfd);
